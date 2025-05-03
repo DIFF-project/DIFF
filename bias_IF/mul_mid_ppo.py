@@ -1,6 +1,5 @@
 import pandas as pd
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from peft import PeftModel, LoraConfig, TaskType
 from datasets import Dataset
 from trl import PPOTrainer, PPOConfig
 from googleapiclient import discovery
@@ -59,36 +58,41 @@ def reward_function(generated_text, label):
     
     return reward
 
+# def compute_toxic_reward(text):
+#     analyze_request = {
+#         'comment': { 'text': text },
+#         'requestedAttributes': {'TOXICITY': {}}
+#     }
+
+#     response = client.comments().analyze(body=analyze_request).execute()
+#     toxicity = response['attributeScores']['TOXICITY']['summaryScore']['value']
+#     toxic_reward = 1 - toxicity
+#     return toxic_reward
+
 if __name__ == '__main__':
 
     args = parse_args()
-    config = {
-      'model_name': args.model_name,
-      'bs': args.bs,
-      'lr': 1.5e-6,
-      'warmup': 0.2,
-      'w_decay': 0.001,
-    }
+    # fluency_scorer = pipeline("text-classification", model="text-fluency-model")
     if args.model_name == 'Qwen/Qwen2.5-1.5B-Instruct':
         name = 'Qwen'
     else:
         name = 'opt'
 
-    od = f'./{name}/{name}_{args.dataset_type}_mid_select_ppo'
+    od = f'./{name}/{name}_{dataset_type}_mid_select_ppo'
 
     if args.model_name == "facebook/opt-1.3b":
         adapter_model_dir = f"./opt_{config['val_type']}_1.3b_select_full/peft_model_{config['val_type']}_1.3b"
     else:
         adapter_model_dir = f"./Qwen/Qwen_{config['val_type']}_1.5b_select_full/peft_model_{config['val_type']}_mid"
 
-    model = AutoModelForCausalLM.from_pretrained(args.model_name)
+    model = AutoModelForCausalLM.from_pretrained(model_name)
     model = PeftModel.from_pretrained(model, adapter_model_dir)
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.pad_token_id = tokenizer.eos_token_id 
 
-    data_path = f"./steprl/{name}/{name}_{args.dataset_type}_mid.csv"
+    data_path = f"./steprl/{name}/{name}_{dataset_type}_mid.csv"
     data = pd.read_csv(data_path)
     dataset = Dataset.from_pandas(data)
 

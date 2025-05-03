@@ -1,11 +1,20 @@
 import pandas as pd
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, OPTForCausalLM
 from datasets import Dataset
 from trl import PPOTrainer, PPOConfig
 from googleapiclient import discovery
 from transformers import pipeline
 import argparse
-import torch
+
+# API_KEY = 'AIzaSyCk6LQap2W6lX0RQJQ1EKM27cpibH6bPNc'
+
+# client = discovery.build(
+#   "commentanalyzer",
+#   "v1alpha1",
+#   developerKey=API_KEY,
+#   discoveryServiceUrl="https://commentanalyzer.googleapis.com/$discovery/rest?version=v1alpha1",
+#   static_discovery=False,
+# )
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -59,6 +68,28 @@ def reward_function(generated_text, label):
     
     return reward
 
+# def reward_function(generated_text):
+#     toxic_score = compute_toxic_reward(generated_text)
+#     fluency_result = fluency_scorer(generated_text)[0]
+#     fluency_score = fluency_result["score"] if fluency_result["label"] == "FLUENT" else 1 - fluency_result["score"]
+    
+#     toxic_weight = 0.8
+#     fluency_weight = 0.2 
+    
+#     reward = (toxic_weight * toxic_score) + (fluency_weight * fluency_score)
+#     return reward
+
+# def compute_toxic_reward(text):
+#     analyze_request = {
+#         'comment': { 'text': text },
+#         'requestedAttributes': {'TOXICITY': {}}
+#     }
+
+#     response = client.comments().analyze(body=analyze_request).execute()
+#     toxicity = response['attributeScores']['TOXICITY']['summaryScore']['value']
+#     toxic_reward = 1 - toxicity
+#     return toxic_reward
+
 if __name__ == '__main__':
 
     args = parse_args()
@@ -68,7 +99,7 @@ if __name__ == '__main__':
     else:
         name = 'opt'
 
-    od = f'./{name}/{name}_{args.dataset_type}_small_select_ppo'
+    od = f'./{name}/{name}_{dataset_type}_small_select_ppo'
 
     # fluency_scorer = pipeline("text-classification", model="text-fluency-model")
     model_name = args.model_name
@@ -79,14 +110,14 @@ if __name__ == '__main__':
     tokenizer.pad_token_id = tokenizer.eos_token_id 
 
     if args.model_name == "facebook/opt-350m":
-        model_path = f"./opt_{args.val_type}_350m_select_full/select_{args.val_type}_small_model.pth"
+        model_path = f"./opt_{config['val_type']}_350m_select_full/select_{config['val_type']}_small_model.pth"
     else:
-        model_path = f"./Qwen/Qwen_{args.val_type}_500m_select_full/select_{args.val_type}_small_model.pth"
+        model_path = f"./Qwen/Qwen_{config['val_type']}_500m_select_full/select_{config['val_type']}_small_model.pth"
 
-    if args.model_path:
+    if config['model_path']:
         model.load_state_dict(torch.load(model_path))
 
-    data_path = f"./steprl/{name}/{name}_{args.dataset_type}_small.csv"
+    data_path = f"./steprl/{name}/{name}_{dataset_type}_small.csv"
     data = pd.read_csv(data_path)
     dataset = Dataset.from_pandas(data)
 

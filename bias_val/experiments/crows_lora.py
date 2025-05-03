@@ -9,10 +9,35 @@ from val.CrowsRunner import Runner
 from peft import PeftModel, LoraConfig, TaskType
 from transformers import AutoModelForCausalLM
 
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description='Configuration for validation and dataset selection'
     )
+    
+    # parser.add_argument(
+    #     '--dataset_type',
+    #     type=str,
+    #     default='balance',
+    #     # choices=['balance', 'wino'],
+    #     help='Type of dataset to use'
+    # )
+
+    # parser.add_argument(
+    #     '--percentage',
+    #     type=str,
+    #     default='0.05',
+    #     help='Percentage of data to use (default: 0.02)'
+    # )
     
     parser.add_argument(
         '--val_type',
@@ -22,6 +47,13 @@ def parse_args():
         help='validation type: crows, stereoset, seat, wino, pure_wino, chat_bias, random'
     )
 
+    parser.add_argument(
+        '--prompt',
+        type=str2bool,
+        default=False,
+        help='Using retrain model or not'
+    )
+    
     parser.add_argument(
         '--bs',
         type=int,
@@ -55,8 +87,11 @@ if __name__ == "__main__":
       'model_name': args.model_name,
       'model_path': r'./model',
       'store_path': r"./output/crows",
-      'data_path': r'./data/crows/crows_pairs_anonymized.csv',
+      'data_path': r'./data/crows/crows_pairs_anonymized.csv' if not args.prompt else r'./data/crows/crows_pairs_prompt.csv',
+      # 'data_type': args.dataset_type,
       'val_type': args.val_type,
+      # 'percentage': args.percentage,
+      # 'dataset_percentage': args.dataset_percentage,
     }
     
     lora_config = LoraConfig(

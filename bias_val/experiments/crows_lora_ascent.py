@@ -13,14 +13,6 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description='Configuration for validation and dataset selection'
     )
-    
-    parser.add_argument(
-        '--dataset_type',
-        type=str,
-        default='balance',
-        # choices=['balance', 'wino'],
-        help='Type of dataset to use'
-    )
 
     parser.add_argument(
         '--percentage',
@@ -56,18 +48,41 @@ def parse_args():
         type=str,
         default='ascent',
     )
+
+    parser.add_argument(
+        '--model_name',
+        type=str,
+        default="Qwen/Qwen2.5-1.5B-Instruct",
+        choices=['Qwen/Qwen2.5-1.5B-Instruct', 'facebook/opt-1.3b'],
+        help='model_name'
+    )
+
+    parser.add_argument(
+       '--ft',
+        action="store_true", 
+        default=False
+    )
+    
     args = parser.parse_args()
     return args
 
 
 if __name__ == "__main__":
     args = parse_args()
+
+    if args.model_name == 'Qwen/Qwen2.5-1.5B-Instruct':
+        name = 'Qwen'
+        num = 1.5
+    else:
+        name = 'opt'
+        num = 1.3
+
     config = {
-      'model_name': 'facebook/opt-1.3b',
+      'model_name': args.model_name,
       'model_path': r'./model',
       'store_path': r"./output/crows",
-      'data_path': r'./data/crows/crows_pairs_anonymized.csv',
-      'data_type': args.dataset_type,
+      'data_path': r'./data/crows/crows_pairs_anonymized.csv' if args.ft else r'./data/crows/crows_pairs_prompt.csv',
+      # 'data_path': r'./data/crows/crows_pairs_anonymized.csv',
       'val_type': args.val_type,
       'percentage': args.percentage,
       'dataset_percentage': args.dataset_percentage
@@ -84,11 +99,12 @@ if __name__ == "__main__":
     model = AutoModelForCausalLM.from_pretrained(config["model_name"])
     model = PeftModel(model, lora_config)
 
-    # adapter_model_dir = adapter_model_dir = f"../bias_IF/opt_{config['val_type']}_1.3b_select_ig/peft_model_{config['val_type']}_1.3b"
-    # adapter_model_dir = adapter_model_dir = f"../bias_sel/opt_{config['val_type']}_1.3b_select_retrained_{config['dataset_percentage']}/select_{config['percentage']}_peft_model_{config['val_type']}_{config['dataset_percentage']}"
-    adapter_model_dir = f"../bias_sel/opt_{config['val_type']}_1.3b_select_{args.ascent_type}/{args.ascent_type}_{config['val_type']}_mid_model_{config['dataset_percentage']}_{config['percentage']}"
+    if args.model_name == "facebook/opt-1.3b":
+      adapter_model_dir = f"../bias_sel/opt_{config['val_type']}_1.3b_select_{args.ascent_type}/{args.ascent_type}_{config['val_type']}_mid_model_{config['dataset_percentage']}_{config['percentage']}"
+    else:
+      adapter_model_dir = f"../bias_sel/Qwen/Qwen_{config['val_type']}_{num}b_select_ascent_{config['dataset_percentage']}/ascent_{config['val_type']}_mid_model_{config['dataset_percentage']}_{config['percentage']}" if args.ft else "../bias_sel/Qwen_trex_1.5b_select_full/peft_model_trex_mid"
 
-    if config['model_path']:
+    if config["model_name"]:
       model = AutoModelForCausalLM.from_pretrained(config["model_name"])
       model = PeftModel.from_pretrained(model, adapter_model_dir)
 
@@ -101,20 +117,10 @@ if __name__ == "__main__":
     runner = Runner(model, tokenizer, config['data_path'])
     results = runner()
 
-    # if config['model_path']:
-    #   output_path = f"{config['store_path']}/results_mid_{config['data_type']}_select_{config['val_type']}/{config['percentage']}_bs{args.bs}/crows_ft.json"
-    # else:
-    #   output_path = f"{config['store_path']}/results_mid_{config['data_type']}_select_{config['val_type']}/{config['percentage']}_bs{args.bs}/crows.json"
-       
     if config['model_path']:
-      output_path = f"{config['store_path']}/results_mid_select_crows_{config['val_type']}_{config['dataset_percentage']}_retrained/{config['percentage']}/crows_ft.json"
+      output_path = f"{config['store_path']}/results_mid_select_crows_{config['val_type']}_{config['dataset_percentage']}_ascent/{config['percentage']}/crows_ft.json"
     else:
-      output_path = f"{config['store_path']}/results_mid_select_crows_{config['val_type']}_{config['dataset_percentage']}_retrained/{config['percentage']}/crows.json"
-       
-    # if config['model_path']:
-    #   output_path = f"{config['store_path']}/results_mid_{config['val_type']}_select_crows_ig/crows_ft.json"
-    # else:
-    #   output_path = f"{config['store_path']}/results_mid_{config['val_type']}_select_crows_ig/crows.json"
+      output_path = f"{config['store_path']}/results_mid_select_crows_{config['val_type']}_{config['dataset_percentage']}_ascent/{config['percentage']}/crows.json"
        
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, 'w') as f:

@@ -1,26 +1,36 @@
 import os
 import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 from torch.utils.data import Dataset
 from transformers import AutoTokenizer
 import torch
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader
-from pytorch_lightning.callbacks import ModelCheckpoint
-from transformers import AutoModelForCausalLM, AdamW, get_cosine_schedule_with_warmup, get_cosine_with_hard_restarts_schedule_with_warmup
+from transformers import AutoModel, AdamW, GPT2LMHeadModel, get_cosine_schedule_with_warmup, get_cosine_with_hard_restarts_schedule_with_warmup
 import torch.nn as nn
 import math
 import warnings
 from torchmetrics.functional.classification import auroc
 import torch.nn.functional as F
 from safetensors.torch import save_file
-from transformers import OPTForCausalLM
-import argparse
+from transformers import AutoModelForCausalLM
 import pdb
-from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training, TaskType
-from pytorch_lightning.callbacks import ModelCheckpoint
+import json
+import argparse
 
+# import os
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+
+class AscentOptimizer(torch.optim.AdamW):
+    def step(self, closure=None):
+
+        for group in self.param_groups:
+            for p in group['params']:
+                if p.grad is not None:
+                    p.grad = -p.grad
+        
+        super().step(closure)
 
 class UCC_Dataset(Dataset):
   def __init__(self, data_path, tokenizer, max_token_len: int=128, sample=500):
@@ -32,6 +42,8 @@ class UCC_Dataset(Dataset):
 
   def _prepare_data(self):
     self.data = pd.read_csv(self.data_path, header=0)
+    if len(self.data) > 10000:
+        self.data = self.data[:10000]
 
   def __len__(self):
     return (len(self.data))
@@ -56,11 +68,9 @@ class UCC_Data_Module(pl.LightningDataModule):
     self.max_token_len = max_token_len
     self.model_name = model_name
     self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-    # eos_token_id = self.tokenizer.eos_token_id
-    # self.tokenizer.pad_token_id = [str(eos_token_id)]
     self.tokenizer.pad_token = self.tokenizer.eos_token
     self.tokenizer.pad_token_id = self.tokenizer.eos_token_id 
-
+    
   def setup(self, stage = None):
     self.dataset = UCC_Dataset(self.data_path, self.tokenizer, max_token_len=self.max_token_len)
 
@@ -83,31 +93,21 @@ class UCC_Classifier(pl.LightningModule):
         self.best_val_loss = float('inf')
         self.config = config
         self.pretrained_model = AutoModelForCausalLM.from_pretrained(config['model_name'], return_dict=True)
+        # self.pretrained_model.load_state_dict(torch.load(config["model_path"]))
+
+        # self.hidden = nn.Linear(self.pretrained_model.config.hidden_size, self.pretrained_model.config.hidden_size)
+        # self.classifier = nn.Linear(self.pretrained_model.config.hidden_size, self.config['n_labels'])
+        # torch.nn.init.xavier_uniform_(self.hidden.weight)
+        # torch.nn.init.xavier_uniform_(self.classifier.weight)
         self.loss_func = nn.CrossEntropyLoss(ignore_index=2)
         self.dropout = nn.Dropout()
         self.tokenizer = AutoTokenizer.from_pretrained(config['model_name'])
-        # eos_token_id = self.tokenizer.eos_token_id
-        # self.tokenizer.pad_token_id = [str(eos_token_id)]
         self.tokenizer.pad_token = self.tokenizer.eos_token
         self.tokenizer.pad_token_id = self.tokenizer.eos_token_id 
-    
-        lora_config = LoraConfig(
-            r=16,
-            lora_alpha=32,
-            target_modules=["q_proj", "v_proj"],
-            lora_dropout=0.05,
-            bias="none",
-            task_type=TaskType.CAUSAL_LM,
-            inference_mode=False
-        )
-        self.pretrained_model = get_peft_model(self.pretrained_model, lora_config)
-        self.pretrained_model.train()
-        self.pretrained_model.print_trainable_parameters()
+
     def forward(self, input_ids, attention_mask):
         outputs = self.pretrained_model(input_ids=input_ids, attention_mask=attention_mask)
         logits = outputs.logits
-        # loss = outputs.loss
-        # pdb.set_trace()
         labels = input_ids[:, 1:]
         shift_logits = logits[:, :-1, :].contiguous()
         shift_labels = labels.contiguous()
@@ -115,12 +115,10 @@ class UCC_Classifier(pl.LightningModule):
         return loss, logits
 
     def training_step(self, batch, batch_index):
-        # if self.current_epoch > 0:
-        #     pdb.set_trace()
         loss, logits = self(**batch)
         self.log("train_loss", loss, prog_bar=True, logger=True)
-        # if batch_index % 100 == 0:
-        self.train_losses.append(loss.item())
+        if batch_index % 100 == 0:
+            self.train_losses.append(loss.item())
         return {"loss": loss, "predictions": logits}
 
     def validation_step(self, batch, batch_index):
@@ -137,55 +135,44 @@ class UCC_Classifier(pl.LightningModule):
         avg_loss = torch.stack([x for x in self.validation_step_outputs]).mean()
         self.log('avg_val_loss', avg_loss)
         self.val_losses.append(avg_loss.item())
-        print(f"Current avg_loss is {avg_loss}")
+        # if avg_loss < self.best_val_loss:
         self.best_val_loss = avg_loss
         output_dir = od
         self.save_model(output_dir)
         self.save_optimizer_state(output_dir) 
-            
         self.validation_step_outputs.clear()
-        output_dir = './fig'
-        self.validation_step_outputs = []
     def configure_optimizers(self):
-        optimizer = AdamW(self.parameters(), lr=self.config['lr'], weight_decay=self.config['w_decay'])
+        optimizer = AscentOptimizer(self.parameters(), lr=self.config['lr'], weight_decay=self.config['w_decay'])
         total_steps = self.config['train_size'] / self.config['bs']
         warmup_steps = math.floor(total_steps * self.config['warmup'])
         scheduler = get_cosine_schedule_with_warmup(optimizer, warmup_steps, total_steps)
         return [optimizer], [scheduler]
-    
     def save_model(self, output_dir):
-        os.makedirs(output_dir, exist_ok=True)
-        # adapter_path = os.path.join(output_dir, f"select_{percentage}_peft_model_{dataset_type}")
-        # adapter_path = os.path.join(output_dir, f"select_{percentage}_peft_model_{dataset_type}_{val_type}")
-        adapter_path = os.path.join(output_dir, f"peft_model_{dataset_type}_mid")
-        self.pretrained_model.peft_config["default"].inference_mode = False
-        self.pretrained_model.save_pretrained(adapter_path)
-
+        torch.save(self.pretrained_model.state_dict(), os.path.join(output_dir, f"ascent_{dataset_type}_small_model_{val_type}_{percentage}.pth"), _use_new_zipfile_serialization=False)
+      
     def save_optimizer_state(self, output_dir):
         optimizer_path = os.path.join(output_dir, "optimizer.bin")
         torch.save(self.optimizers().state_dict(), optimizer_path)
 
     def load_optimizer_state(self, optimizer, optimizer_path):
         optimizer.load_state_dict(torch.load(optimizer_path))
-
+        
 def parse_args():
     parser = argparse.ArgumentParser(
         description='Configuration for validation and dataset selection'
     )
 
-    # parser.add_argument(
-    #     '--val_type',
-    #     type=str,
-    #     default='crows',
-    #     # choices=['crows', 'stereoset', 'seat'],
-    #     help='Type of validation to perform'
-    # )
+    parser.add_argument(
+        '--val_type',
+        type=str,
+        default='stereoset',
+        help='Type of validation to perform'
+    )
     
     parser.add_argument(
         '--dataset_type',
         type=str,
         default='balance',
-        # choices=['balance', 'wino', 'pure_wino', 'chat_bias', 'stereoset', 'crows', 'seat', 'prompt', 'gen', 'prompt_few', 'mix', 'mix_few', 'news', 'toxic_mix', 'toxic_mix_few'],
         help='Type of dataset to use'
     )
 
@@ -199,83 +186,75 @@ def parse_args():
     parser.add_argument(
         '--bs',
         type=int,
-        default=16,
+        default=8,
         help='batch size'
     )
-    
+        
     parser.add_argument(
         '--model_name',
         type=str,
-        default="Qwen/Qwen2.5-1.5B-Instruct",
-        choices=['Qwen/Qwen2.5-1.5B-Instruct', 'facebook/opt-1.3b'],
+        default="facebook/opt-350m",
+        choices=['Qwen/Qwen2.5-0.5B', 'facebook/opt-350m'],
         help='model_name'
     )
-    
+
     args = parser.parse_args()
     return args
 
+
 args = parse_args()
-# val_type = args.val_type
+val_type = args.val_type
 percentage = args.percentage
 dataset_type = args.dataset_type
-if args.model_name == 'Qwen/Qwen2.5-1.5B-Instruct':
+
+if args.model_name == 'Qwen/Qwen2.5-0.5B':
     name = 'Qwen'
-    num = 1.5
+    num = 500
 else:
     name = 'opt'
-    num = 1.3
-if dataset_type in ['stereoset', 'crows', 'seat', 'prompt', 'gen', 'mix', 'news', 'toxic_mix', 'crows_t', 'gen_mix', 'trex']:
-    od = f'./{name}/{name}_{dataset_type}_{num}b_select_full'
-elif dataset_type[-4:] == 'full':
-    od = f'./{name}/{name}_{dataset_type[:-5]}_full_{num}b_select_ig'
-elif dataset_type == "TREX":
-    od = f'./{name}/{name}_{dataset_type}_{num}b_trex_ori'
+    num = 350
+
+if dataset_type in ['stereoset', 'crows', 'seat', 'prompt', 'gen', 'mix', 'news', 'toxic_mix', 'crows_t', 'gen_mix']:
+    od = f'./{name}/{name}_{dataset_type}_{num}m_select_ascent_{val_type}'
+else:
+    od = f'./{name}/{name}_{dataset_type}_{num}m_select_ascent_{val_type}'
 
 
 if __name__ == '__main__':
-
     warnings.filterwarnings("ignore", category=FutureWarning)
-    checkpoint_callback = ModelCheckpoint(
-        dirpath=f"./{name}/{name}_{dataset_type}_{num}b_select_full", 
-        filename=f'{dataset_type}_bestmodel',
-        monitor="val_loss",
-        mode="min",
-        save_top_k=1,
-    )
+    
     if not os.path.exists(od):
         os.makedirs(od)
         print(f"创建目录：{od}")
     else:
         print(f"目录已存在：{od}")
-        
-    # data_path = f"./data/{dataset_type}_random/{percentage}/{dataset_type}_random_sample.csv"
-    if dataset_type == 'pure_wino' or dataset_type == 'chat_bias':
-        data_path = f"./data/{dataset_type}.csv"
-    if dataset_type in ['stereoset', 'crows', 'seat', 'prompt', 'gen', 'mix', 'news', 'toxic_mix', 'crows_t', 'gen_mix', 'trex']:
-        data_path = f"./data/val_data/{dataset_type}_data.csv"
-    if dataset_type == 'crows_gen':
-        data_path = "./data/step2_val_data/crows_gen_data.csv"
-    if dataset_type[-4:] == 'full':
-        data_path = f"./data/val_data/{dataset_type[:-5]}_data.csv"
-    if dataset_type[-3:] == 'few':
-        data_path = f"./data/{dataset_type[:-4]}_random/{percentage}/{dataset_type[:-4]}_random_sample.csv"
-    if dataset_type == 'TREX':
-        data_path = "./data/TREX/TREX_data.csv"
+
+    if args.model_name == 'Qwen/Qwen2.5-0.5B':
+        data_path = f"./data/Qwen/{num}m_{dataset_type}_{val_type}/{percentage}/{dataset_type}_dataset_not_select_{val_type}.csv"
+        model_path = f"./Qwen/Qwen_{dataset_type}_{num}m_select_full/select_{dataset_type}_small_model.pth"
+        # optimizer_path = f"./Qwen/Qwen_{dataset_type}_{num}m_select_full/optimizer.bin"
+        ckpt_path = f"./Qwen/Qwen_{dataset_type}_{num}m_select_full/{dataset_type}_bestmodel.ckpt"
+    else:
+        data_path = f"./data/{num}m_{dataset_type}_{val_type}/{percentage}/{dataset_type}_dataset_not_select_{val_type}.csv" 
+        model_path = f"./opt_{dataset_type}_{num}m_select_full/select_{dataset_type}_small_model.pth"
+        # optimizer_path = f"./opt_{dataset_type}_{num}m_select_full/optimizer.bin"
+        ckpt_path = f"./opt_{dataset_type}_{num}m_select_full/{dataset_type}_bestmodel.ckpt"
+
+    # model_name = 'facebook/opt-350m'
     
     ucc_data_module = UCC_Data_Module(data_path)
     ucc_data_module.setup()
-    print(data_path)
-
     dl = ucc_data_module.train_dataloader()
 
     config = {
       'model_name': args.model_name,
       'bs': args.bs,
-      'lr': 1.5e-6,
+      'lr': 1.5e-8,
       'warmup': 0.2,
       'train_size': len(ucc_data_module.train_dataloader()),
       'w_decay': 0.001,
-      'n_epochs': 50 if dataset_type in ['stereoset', 'crows', 'seat', 'prompt', 'gen', 'mix', 'news', 'toxic_mix', 'crows_t', 'gen_mix', 'trex', 'TREX'] else 5
+      'n_epochs': 80,
+      'model_path': model_path,
     }
 
     ucc_data_module = UCC_Data_Module(data_path, batch_size=config['bs'], model_name=args.model_name)
@@ -283,6 +262,9 @@ if __name__ == '__main__':
 
     model = UCC_Classifier(config)
 
-    trainer = pl.Trainer(max_epochs=config['n_epochs'], devices=[0], num_sanity_val_steps=10, callbacks=[checkpoint_callback])
-    trainer.fit(model, ucc_data_module)
+    trainer = pl.Trainer(max_epochs=config['n_epochs'], devices=[0], num_sanity_val_steps=10, log_every_n_steps=10000)
+    # trainer.strategy.connect(model)
+    # optimizer_state_dict = torch.load(config['optimizer_path'])
+    # model.optimizers().load_state_dict(optimizer_state_dict)
+    trainer.fit(model, ucc_data_module, ckpt_path=ckpt_path)
     # model.save_optimizer_state(output_dir)

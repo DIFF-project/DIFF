@@ -1,0 +1,11 @@
+transformers==4.43.2
+matplotlib
+scikit-learn
+peft
+traker
+google-api-python-client
+argparse
+datasets
+trl
+pandas
+pytorch_ligntning

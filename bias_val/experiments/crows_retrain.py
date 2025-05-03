@@ -1,6 +1,7 @@
 import json
 import transformers
 import torch
+import pdb
 import argparse
 
 from val.CrowsRunner import Runner
@@ -9,13 +10,6 @@ from transformers import AutoModelForCausalLM
 def parse_args():
     parser = argparse.ArgumentParser(
         description='Configuration for validation and dataset selection'
-    )
-    
-    parser.add_argument(
-        '--dataset_type',
-        type=str,
-        default='balance',
-        help='Type of dataset to use'
     )
 
     parser.add_argument(
@@ -50,9 +44,23 @@ def parse_args():
     parser.add_argument(
         '--model_name',
         type=str,
-        default="facebook/opt-350m",
+        default="Qwen/Qwen2.5-0.5B",
         choices=['Qwen/Qwen2.5-0.5B', 'facebook/opt-350m'],
         help='model_name'
+    )
+
+    parser.add_argument(
+        '--debias_type',
+        type=str,
+        default="retrain",
+        choices=['retrain', 'npo'],
+        help='model_name'
+    )
+
+    parser.add_argument(
+        '--idx',
+        type=int,
+        default=14,
     )
     
     args = parser.parse_args()
@@ -73,7 +81,6 @@ if __name__ == "__main__":
       'model_path': r'./model',
       'store_path': r"./output/crows",
       'data_path': r'./data/crows/crows_pairs_anonymized.csv',
-      'data_type': args.dataset_type,
       'dataset_percentage': args.dataset_percentage,
       'val_type': args.val_type,
       'percentage': args.percentage
@@ -81,14 +88,25 @@ if __name__ == "__main__":
 
     model = AutoModelForCausalLM.from_pretrained(config["model_name"])
 
-    if args.model_name == "facebook/opt-350m":
-        model_path = f"../bias_sel/opt_{config['val_type']}_350m_select_retrained_{config['dataset_percentage']}/select_{config['val_type']}_small_model_{config['percentage']}_{config['dataset_percentage']}.pth"
-    else:
-        model_path = f"../bias_sel/Qwen/Qwen_{config['val_type']}_500m_select_retrained_{config['dataset_percentage']}/select_{config['val_type']}_small_model_{config['percentage']}_{config['dataset_percentage']}.pth"
+    if args.debias_type == 'retrain':
+        if args.model_name == "facebook/opt-350m":
+            model_path = f"../bias_sel/opt_{config['val_type']}_350m_select_retrained_{config['dataset_percentage']}/select_{config['val_type']}_small_model_{config['percentage']}_{config['dataset_percentage']}.pth"
+        else:
+            model_path = f"../bias_sel/Qwen/Qwen_{config['val_type']}_500m_select_retrained_{config['dataset_percentage']}/select_{config['val_type']}_small_model_{config['percentage']}_{config['dataset_percentage']}.pth"
+        if config['model_path']:
+            model.load_state_dict(torch.load(model_path))
 
-    # if config['model_path']:
-    #     model.load_state_dict(torch.load(model_path))
+    elif args.debias_type == 'npo':
+        if args.model_name == "facebook/opt-350m":
+            model_path = f"../bias_sel/opt_{config['val_type']}_350m_select_npo_{config['dataset_percentage']}"
+        else:
+            model_path = f"../bias_sel/Qwen/npo/{args.idx}_Qwen_{config['val_type']}_500m_select_npo_{config['dataset_percentage']}"
+        model = AutoModelForCausalLM.from_pretrained(
+            model_path,
+            trust_remote_code=True,
+        )
 
+    
     print(model_path)
     
     model.eval()

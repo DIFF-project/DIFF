@@ -12,13 +12,6 @@ def parse_args():
     )
     
     parser.add_argument(
-        '--dataset_type',
-        type=str,
-        default='balance',
-        help='Type of dataset to use'
-    )
-
-    parser.add_argument(
         '--percentage',
         type=str,
         default='0.02',
@@ -52,18 +45,33 @@ def parse_args():
         type=str,
         default='ascent',
     )
+
+    parser.add_argument(
+        '--model_name',
+        type=str,
+        default="facebook/opt-350m",
+        choices=['Qwen/Qwen2.5-0.5B', 'facebook/opt-350m'],
+        help='model_name'
+    )
     
     args = parser.parse_args()
     return args
 
 if __name__ == "__main__":
     args = parse_args()
+
+    if args.model_name == 'Qwen/Qwen2.5-0.5B':
+        name = 'Qwen'
+        num = 500
+    else:
+        name = 'opt'
+        num = 350
+
     config = {
-      'model_name': 'facebook/opt-350m',
+      'model_name': args.model_name,
       'model_path': r'./model',
       'store_path': r"./output/crows",
       'data_path': r'./data/crows/crows_pairs_anonymized.csv',
-      'data_type': args.dataset_type,
       'dataset_percentage': args.dataset_percentage,
       'val_type': args.val_type,
       'percentage': args.percentage
@@ -72,9 +80,12 @@ if __name__ == "__main__":
     model = AutoModelForCausalLM.from_pretrained(config["model_name"])
     model_path = f"../bias_sel/opt_{config['val_type']}_350m_select_{args.ascent_type}/{args.ascent_type}_{config['val_type']}_small_model_{config['dataset_percentage']}_{config['percentage']}.pth"
 
+    if args.model_name == "facebook/opt-350m":
+        model_path = f"../bias_sel/opt_{config['val_type']}_350m_select_{args.ascent_type}/{args.ascent_type}_{config['val_type']}_small_model_{config['dataset_percentage']}_{config['percentage']}.pth"
+    else:
+        model_path = f"../bias_sel/Qwen/Qwen_{config['val_type']}_500m_select_{args.ascent_type}_{config['dataset_percentage']}/ascent_{config['val_type']}_small_model_{config['dataset_percentage']}_{config['percentage']}.pth"
+
     if config['model_path']:
-        # import pdb
-        # pdb.set_trace()
         model.load_state_dict(torch.load(model_path))
 
     print(model_path)
@@ -87,9 +98,9 @@ if __name__ == "__main__":
     results = runner()
 
     if config['model_path']:
-      output_path = f"{config['store_path']}/results_small_{config['val_type']}_select_{config['val_type']}_{config['dataset_percentage']}/{config['percentage']}/crows_ft.json"
+      output_path = f"{config['store_path']}/results_small_ascent_{config['val_type']}_{config['dataset_percentage']}/{config['percentage']}/crows_ft.json"
     else:
-      output_path = f"{config['store_path']}/results_small_{config['val_type']}_select_{config['val_type']}_{config['dataset_percentage']}/{config['percentage']}/crows.json"
+      output_path = f"{config['store_path']}/results_small_ascent_{config['val_type']}_{config['dataset_percentage']}/{config['percentage']}/crows.json"
     # if config['model_path']:
     #   output_path = f"{config['store_path']}/results_small_select_{config['val_type']}/{config['percentage']}/crows_full.json"
     # else:

@@ -1,5 +1,0 @@
-transformers==4.43.2
-matplotlib
-scikit-learn
-peft
-traker

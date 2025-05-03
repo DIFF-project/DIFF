@@ -2,6 +2,8 @@
 
 > This is the repository of project "Data Attribution With Influence function(DIFF)". To replicate our results, you may follow the steps below
 
+![main](./fig/main.png)
+
 ## Install
 
 ```bash

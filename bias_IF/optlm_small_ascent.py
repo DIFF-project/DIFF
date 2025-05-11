@@ -1,24 +1,27 @@
 import os
-import matplotlib.pyplot as plt
-import pandas as pd
-import numpy as np
-from torch.utils.data import Dataset
-from transformers import AutoTokenizer
-import torch
-import pytorch_lightning as pl
-from torch.utils.data import DataLoader
-from transformers import AutoModel, AdamW, GPT2LMHeadModel, get_cosine_schedule_with_warmup, get_cosine_with_hard_restarts_schedule_with_warmup
-import torch.nn as nn
 import math
-import warnings
-from torchmetrics.functional.classification import auroc
-import torch.nn.functional as F
-from safetensors.torch import save_file
-from transformers import GPT2LMHeadModel, GPT2Tokenizer
-from transformers import OPTForCausalLM
-import pdb
 import json
 import argparse
+import warnings
+import pdb
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.utils.data import Dataset, DataLoader
+import pytorch_lightning as pl
+from torchmetrics.functional.classification import auroc
+
+from transformers import (
+    AutoTokenizer,
+    OPTForCausalLM,
+    AutoModelForCausalLM,
+    get_cosine_schedule_with_warmup,
+)
 
 # import os
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
@@ -93,12 +96,6 @@ class UCC_Classifier(pl.LightningModule):
         self.best_val_loss = float('inf')
         self.config = config
         self.pretrained_model = OPTForCausalLM.from_pretrained(config['model_name'], return_dict=True)
-        # self.pretrained_model.load_state_dict(torch.load(config["model_path"]))
-
-        # self.hidden = nn.Linear(self.pretrained_model.config.hidden_size, self.pretrained_model.config.hidden_size)
-        # self.classifier = nn.Linear(self.pretrained_model.config.hidden_size, self.config['n_labels'])
-        # torch.nn.init.xavier_uniform_(self.hidden.weight)
-        # torch.nn.init.xavier_uniform_(self.classifier.weight)
         self.loss_func = nn.CrossEntropyLoss(ignore_index=2)
         self.dropout = nn.Dropout()
         self.tokenizer = AutoTokenizer.from_pretrained(config['model_name'])
@@ -243,8 +240,4 @@ if __name__ == '__main__':
     model = UCC_Classifier(config)
 
     trainer = pl.Trainer(max_epochs=config['n_epochs'], devices=[0], num_sanity_val_steps=10, log_every_n_steps=10000)
-    # trainer.strategy.connect(model)
-    # optimizer_state_dict = torch.load(config['optimizer_path'])
-    # model.optimizers().load_state_dict(optimizer_state_dict)
     trainer.fit(model, ucc_data_module, ckpt_path=f"./opt_{dataset_type}_350m_select_full/{dataset_type}_bestmodel.ckpt")
-    # model.save_optimizer_state(output_dir)

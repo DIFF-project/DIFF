@@ -14,22 +14,28 @@ pip install -r requirements.txt
 
 ## Step 1: Warmup/Train your model for few epochs
 
+> You should run the following command in ***./bias_IF***
+>
+> ```bash
+> cd bias_IF
+> ```
+
 - Train from scratch:
 
   ```bash
-  python bias_IF/mul_mid_gender --dataset gen_mix_full --model_name Qwen/Qwen2.5-1.5B-Instruct --bs 16
+  python -m mul_mid_gender --dataset gen_mix_full --model_name Qwen/Qwen2.5-1.5B-Instruct --bs 16
   ```
 
 - Finetune with few example:
 
   ```bash
-  python bias_IF/mul_mid_gender --dataset gen_mix_few --percentage 0.05 --model_name Qwen/Qwen2.5-1.5B-Instruct --bs 16
+  python -m mul_mid_gender --dataset gen_mix_few --percentage 0.05 --model_name Qwen/Qwen2.5-1.5B-Instruct --bs 16
   ```
 
 - Train the whole model for more epochs:
 
   ```bash
-  python bias_IF/mul_mid_gender --dataset trex --model_name Qwen/Qwen2.5-1.5B-Instruct --bs 16
+  python -m mul_mid_gender --dataset trex --model_name Qwen/Qwen2.5-1.5B-Instruct --bs 16
   ```
 
 ## Step 2&3&4:
@@ -37,7 +43,6 @@ pip install -r requirements.txt
 > We with a training script to run step 2&3&4 in just 3 lines. 
 
 ```bash
-cd bias_IF
 bash script/train_ppl.sh Qwen gen_mix full 1.5b
 bash script/step4.sh gen_mix 1.5b full Qwen
 ```
@@ -52,17 +57,17 @@ bash script/step4.sh gen_mix 1.5b full Qwen
 
   ```bash
   # DIFF dataset gradients
-  python -m bias_IF/step2.get_info_qwen_lora --output_path ./step2/Qwen/result_1.5b_trex_val_full --gradient_type sgd --ds step2_val_data/crows_gen_data.csv --md_path ./Qwen/Qwen_trex_full_1.5b_select_ig --dataset_type trex_full --model_name Qwen/Qwen2.5-1.5B-Instruct
+  python -m step2.get_info_qwen_lora --output_path ./step2/Qwen/result_1.5b_trex_val_full --gradient_type sgd --ds step2_val_data/crows_gen_data.csv --md_path ./Qwen/Qwen_trex_full_1.5b_select_ig --dataset_type trex_full --model_name Qwen/Qwen2.5-1.5B-Instruct
   
   # Train dataset gradients
-  python -m bias_IF/step2.get_info_qwen_lora --output_path ./step2/Qwen/result_1.5b_trex_val_full --gradient_type adam --ds step2_val_data/crows_gen_data.csv --md_path ./Qwen/Qwen_trex_full_1.5b_select_ig --dataset_type trex_full --model_name Qwen/Qwen2.5-1.5B-Instruct
+  python -m step2.get_info_qwen_lora --output_path ./step2/Qwen/result_1.5b_trex_val_full --gradient_type adam --ds step2_val_data/crows_gen_data.csv --md_path ./Qwen/Qwen_trex_full_1.5b_select_ig --dataset_type trex_full --model_name Qwen/Qwen2.5-1.5B-Instruct
   ```
 
 - For small model
 
   ```bash
   # DIFF dataset gradients
-  python -m bias_IF/step2.get_info_qwen --output_path ./step2/Qwen/result_1.5b_trex_val_full --gradient_type sgd --ds step2_val_data/crows_gen_data.csv --md_path ./Qwen/Qwen_trex_full_1.5b_select_ig --dataset_type trex_full --model_name Qwen/Qwen2.5-1.5B-Instruct
+  python -m step2.get_info_qwen --output_path ./step2/Qwen/result_1.5b_trex_val_full --gradient_type sgd --ds step2_val_data/crows_gen_data.csv --md_path ./Qwen/Qwen_trex_full_1.5b_select_ig --dataset_type trex_full --model_name Qwen/Qwen2.5-1.5B-Instruct
   
   # Train dataset gradients
   python -m bias_IF/step2.get_info_qwen --output_path ./step2/Qwen/result_1.5b_trex_val_full --gradient_type adam --ds step2_val_data/crows_gen_data.csv --md_path ./Qwen/Qwen_trex_full_1.5b_select_ig --dataset_type trex_full --model_name Qwen/Qwen2.5-1.5B-Instruct
@@ -73,7 +78,7 @@ bash script/step4.sh gen_mix 1.5b full Qwen
 > Find the influence score between the training dataset and our DIFF dataset
 
 ```bash
-python -m bias_IF/step3.cal_IF --model_size 1.5b --train_type trex --dataset_percentage full
+python -m step3.cal_IF --model_size 1.5b --train_type trex --dataset_percentage full
 ```
 
 ## Step 4: Save to csv
@@ -81,7 +86,7 @@ python -m bias_IF/step3.cal_IF --model_size 1.5b --train_type trex --dataset_per
 > Choose any percentage you like and save the top k% bias training dataset.
 
 ```bash
-python -m bias_IF/step4.write_selected_data --model_size 1.5b --dataset_percentage full --val_type trex --percentage 0.35 --model_name Qwen
+python -m step4.write_selected_data --model_size 1.5b --dataset_percentage full --val_type trex --percentage 0.35 --model_name Qwen
 ```
 
 ## Step 5: Debiasing the model
@@ -92,17 +97,17 @@ python -m bias_IF/step4.write_selected_data --model_size 1.5b --dataset_percenta
 
   ```bash
   # mid model
-  python bias_IF/optlm_mid_retrain.py --val_type full --dataset_type trex --percentage 0.35
+  python optlm_mid_retrain.py --val_type full --dataset_type trex --percentage 0.35
   
   # small model
-  python bias_IF/optlm_samll_retrain.py --val_type full --dataset_type trex --percentage 0.35
+  python optlm_samll_retrain.py --val_type full --dataset_type trex --percentage 0.35
   ```
 
 - Ascent
 
   ```bash
   # mid model
-  python bias_IF/optlm_mid_ascent.py --val_type full --dataset_type trex --percentage 0.35
+  python optlm_mid_ascent.py --val_type full --dataset_type trex --percentage 0.35
   
   # small model
   python bias_IF/optlm_small_ascent.py --val_type full --dataset_type trex --percentage 0.35
@@ -111,11 +116,8 @@ python -m bias_IF/step4.write_selected_data --model_size 1.5b --dataset_percenta
 - RL
 
   ```bash
-  # mid model
-  python bias_IF/optlm_mid_ppo.py --val_type full --dataset_type trex --percentage 0.35
-  
-  # small model
-  python bias_IF/optlm_small_ppo.py --val_type full --dataset_type trex --percentage 0.35
+  cd step5
+  python train.py --val_type full --dataset_type trex --percentage 0.35 --model_name Qwen/Qwen2.5-1.5B-Instruct
   ```
 
 ## Validate your model
@@ -123,3 +125,10 @@ python -m bias_IF/step4.write_selected_data --model_size 1.5b --dataset_percenta
 > We provide comprehensive validation script in './bias_val', including crows_pair, seat, stereoset, perplexity, trex(trex dataset only)
 >
 > You may try them in the './bias_val/experiments' folder 
+>
+> For instance:
+>
+> ```bash
+> cd ../bias_val
+> python -m experiments.crows_lora_retrain --percentage 0.35 --dataset_percentage full --model_name Qwen/Qwen2.5-1.5B-Instruct --debias_type retrain
+> ```

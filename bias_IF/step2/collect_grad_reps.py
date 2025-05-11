@@ -159,57 +159,23 @@ def obtain_gradients_with_adam(model, batch, avg, avg_sq):
     return vectorized_grads
 
 def prepare_optimizer_state(model, optimizer_state, device):
-    names = [n for n, p in model.named_parameters() if p.requires_grad]
-    # for key in optimizer_state.keys():
-    #     print(f"Key: {key}")
-    # avg = torch.cat([optimizer_state[n]["exp_avg"].view(-1) for n in names])
-    # pdb.set_trace()
-    avg = torch.cat([optimizer_state[n]["exp_avg"].view(-1) for n in range(len(names))])
-    avg_sq = torch.cat([optimizer_state[n]["exp_avg_sq"].view(-1) for n in range(len(names))])
-    avg = avg.to(device)
-    avg_sq = avg_sq.to(device)
-    return avg, avg_sq
+    try:
+        names = [n for n, p in model.named_parameters() if p.requires_grad]
+        avg = torch.cat([optimizer_state[n]["exp_avg"].view(-1) for n in range(len(names))])
+        avg_sq = torch.cat([optimizer_state[n]["exp_avg_sq"].view(-1) for n in range(len(names))])
+        avg = avg.to(device)
+        avg_sq = avg_sq.to(device)
 
-# def prepare_optimizer_state(model, optimizer_state, device):
-#     names = [n for n, p in model.named_parameters() if p.requires_grad and "lora" in n]
-#     # for key in optimizer_state.keys():
-#     #     print(f"Key: {key}")
-#     # avg = torch.cat([optimizer_state[n]["exp_avg"].view(-1) for n in names])
-#     if len(names) != len(optimizer_state):
-#         print(f"Warning: Number of trainable parameters ({len(trainable_params)}) "
-#             f"doesn't match optimizer states ({len(adam_optimizer_state)})")
-#         print("\nTrainable parameter names:")
-#         pdb.set_trace()
-#     avg = torch.cat([optimizer_state[n]["exp_avg"].view(-1) for n in names])
-#     avg_sq = torch.cat([optimizer_state[n]["exp_avg_sq"].view(-1) for n in names])
-#     avg = avg.to(device)
-#     avg_sq = avg_sq.to(device)
-#     return avg, avg_sq
+        return avg, avg_sq
+    
+    except:
+        names = [n for n, p in model.named_parameters() if p.requires_grad and "lora" in n]
+        avg = torch.cat([optimizer_state[n]["exp_avg"].view(-1) for n in names])
+        avg_sq = torch.cat([optimizer_state[n]["exp_avg_sq"].view(-1) for n in names])
+        avg = avg.to(device)
+        avg_sq = avg_sq.to(device)
 
-# def prepare_optimizer_state(model, optimizer_state, device):
-#     names_and_params = [(n, p) for n, p in model.named_parameters() if p.requires_grad]
-#     min_key = min(int(k) for k in optimizer_state.keys())
-    
-#     state_tensors = []
-#     state_sq_tensors = []
-    
-#     for i, (name, param) in enumerate(names_and_params):
-#         state_key = min_key + i
-#         if state_key in optimizer_state:
-#             exp_avg = optimizer_state[state_key]["exp_avg"].to(device).view(-1)
-#             exp_avg_sq = optimizer_state[state_key]["exp_avg_sq"].to(device).view(-1)
-#             state_tensors.append(exp_avg)
-#             state_sq_tensors.append(exp_avg_sq)
-#             print(f"Mapped {name} to optimizer state key {state_key}")
-    
-#     if not state_tensors:
-#         raise ValueError("No optimizer states found for any parameters")
-    
-#     avg = torch.cat(state_tensors)
-#     avg_sq = torch.cat(state_sq_tensors)
-    
-#     return avg, avg_sq
-
+        return avg, avg_sq
 
 def collect_grads(dataloader,
                   model,
@@ -449,85 +415,3 @@ def get_loss(dataloader: torch.utils.data.DataLoader,
         total_loss / total_tokens)}
     with open(os.path.join(output_dir, "loss.txt"), "w") as f:
         f.write(json.dumps(result, indent=4))
-
-
-# def map_projection(grads: torch.Tensor, n_components: int):
-#     # 计算协方差矩阵
-#     cov = torch.mm(grads.t(), grads) / grads.shape[0]
-    
-#     # 计算特征值和特征向量
-#     eigenvalues, eigenvectors = torch.linalg.eigh(cov)
-    
-#     # 选择最大的n_components个特征值对应的特征向量
-#     idx = torch.argsort(eigenvalues, descending=True)[:n_components]
-#     components = eigenvectors[:, idx]
-    
-#     # 投影数据
-#     projected = torch.mm(grads, components)
-    
-#     return projected, components
-
-# def collect_grads(dataloader,
-#                   model,
-#                   output_dir,
-#                   n_components: int = 8192,
-#                   adam_optimizer_state: Optional[dict] = None,
-#                   gradient_type: str = "adam",
-#                   max_samples: Optional[int] = None,
-#                   batch_size = 32):
-
-#     device = next(model.parameters()).device
-#     dtype = next(model.parameters()).dtype
-
-#     if gradient_type == "adam":
-#         assert adam_optimizer_state is not None
-#         m, v = prepare_optimizer_state(model, adam_optimizer_state, device)
-
-#     count = 0
-#     os.makedirs(output_dir, exist_ok=True)
-
-#     all_grads = []
-#     all_projected_grads = []
-#     all_projection_components = []
-
-#     for batch in tqdm(dataloader, total=len(dataloader)):
-#         prepare_batch(batch)
-#         count += 1
-
-#         if gradient_type == "adam":
-#             vectorized_grads = obtain_gradients_with_adam(model, batch, m, v)
-#         elif gradient_type == "sign":
-#             vectorized_grads = obtain_sign_gradients(model, batch)
-#         else:
-#             vectorized_grads = obtain_gradients(model, batch)
-            
-#         all_grads.append(vectorized_grads.cpu())
-#         model.zero_grad()
-
-#         if len(all_grads) >= batch_size:
-#             batch_grads = torch.cat(all_grads, dim=0)
-#             pdb.set_trace()
-#             projected_grads, projection_components = map_projection(batch_grads, n_components)
-            
-#             all_projected_grads.append(projected_grads)
-#             all_projection_components.append(projection_components)
-            
-#             all_grads = []
-
-#     # 最后合并所有结果
-#     if all_grads:
-#         batch_grads = torch.cat(all_grads, dim=0)
-#         projected_grads, projection_components = map_projection(batch_grads, n_components)
-        
-#         all_projected_grads.append(projected_grads)
-#         all_projection_components.append(projection_components)
-
-#     # 合并所有投影结果
-#     final_projected_grads = torch.cat(all_projected_grads, dim=0)
-#     final_projection_components = torch.cat(all_projection_components, dim=1)
-
-#     outfile = os.path.join(output_dir, "map_grads.pt")
-#     torch.save({
-#         'projected_grads': final_projected_grads,
-#         'projection_components': final_projection_components
-#     }, outfile)

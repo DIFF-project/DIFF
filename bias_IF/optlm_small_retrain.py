@@ -1,24 +1,33 @@
+# Standard libraries
 import os
-import matplotlib.pyplot as plt
-import pandas as pd
-import numpy as np
-from torch.utils.data import Dataset
-from transformers import AutoTokenizer
-import torch
-import pytorch_lightning as pl
-from torch.utils.data import DataLoader
-from transformers import AutoModelForCausalLM, AutoModel, AdamW, GPT2LMHeadModel, get_cosine_schedule_with_warmup, get_cosine_with_hard_restarts_schedule_with_warmup
-import torch.nn as nn
 import math
-import warnings
-from torchmetrics.functional.classification import auroc
-import torch.nn.functional as F
-from safetensors.torch import save_file
-import pdb
 import json
+import warnings
 import argparse
+import pdb
 
-# import os
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.utils.data import Dataset, DataLoader
+from torchmetrics.functional.classification import auroc
+
+from transformers import (
+    AutoTokenizer,
+    AutoModel,
+    AutoModelForCausalLM,
+    GPT2LMHeadModel,
+    AdamW,
+    get_cosine_schedule_with_warmup,
+    get_cosine_with_hard_restarts_schedule_with_warmup,
+)
+
+import pytorch_lightning as pl
+
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
 class UCC_Dataset(Dataset):
@@ -31,8 +40,6 @@ class UCC_Dataset(Dataset):
 
   def _prepare_data(self):
     self.data = pd.read_csv(self.data_path, header=0)
-    # if len(self.data) > 10000:
-    #     self.data = self.data[:10000]
 
   def __len__(self):
     return (len(self.data))
@@ -57,8 +64,6 @@ class UCC_Data_Module(pl.LightningDataModule):
     self.max_token_len = max_token_len
     self.model_name = model_name
     self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-    # eos_token_id = self.tokenizer.eos_token_id
-    # self.tokenizer.pad_token_id = [str(eos_token_id)]
     self.tokenizer.pad_token = self.tokenizer.eos_token
     self.tokenizer.pad_token_id = self.tokenizer.eos_token_id 
 
@@ -87,8 +92,6 @@ class UCC_Classifier(pl.LightningModule):
         self.loss_func = nn.CrossEntropyLoss(ignore_index=2)
         self.dropout = nn.Dropout()
         self.tokenizer = AutoTokenizer.from_pretrained(config['model_name'])
-        # eos_token_id = self.tokenizer.eos_token_id
-        # self.tokenizer.pad_token_id = [str(eos_token_id)]
         self.tokenizer.pad_token = self.tokenizer.eos_token
         self.tokenizer.pad_token_id = self.tokenizer.eos_token_id 
 
@@ -122,7 +125,7 @@ class UCC_Classifier(pl.LightningModule):
         avg_loss = torch.stack([x for x in self.validation_step_outputs]).mean()
         self.log('avg_val_loss', avg_loss)
         self.val_losses.append(avg_loss.item())
-        # if avg_loss < self.best_val_loss:
+        
         self.best_val_loss = avg_loss
         output_dir = od
         self.save_model(output_dir)
@@ -193,13 +196,6 @@ def parse_args():
         default=16,
         help='batch size'
     )
-    
-    # parser.add_argument(
-    #     '--model_size',
-    #     type=str,
-    #     default="350m",
-    #     help='model size'
-    # )
 
     parser.add_argument(
         '--model_name',

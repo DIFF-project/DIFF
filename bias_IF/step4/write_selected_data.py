@@ -98,7 +98,6 @@ def preserve_csv_with_batch_indices(input_csv, output_csv, topk_indices, output_
     print(f"已处理完成。保留了 {len(remaining_rows)} 行，删除了 {len(df) - len(remaining_rows)} 行。")
 
 if __name__ == "__main__":
-    # pdb.set_trace()
     args = parse_args()
     assert args.percentage is not None or args.max_samples is not None
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -140,15 +139,12 @@ if __name__ == "__main__":
         data_from_list.append(tensor)
     data_from = torch.cat(data_from_list).to(device)
 
-    # data_from = torch.cat([torch.ones(line_num, dtype=torch.long)
-    #                         * i for i, line_num in enumerate(num_samples)]).to(device)
     sorted_scores, sorted_index = torch.sort(
         all_scores, dim=0, descending=True)
     sorted_score_file = os.path.join(output_path, f"sorted.csv")
 
     data_from = data_from[sorted_index]
     sorted_index = file_specific_index[sorted_index]
-    # pdb.set_trace()
 
     if not os.path.exists(sorted_score_file):
         with open(sorted_score_file, 'w', encoding='utf-8') as file:
@@ -167,5 +163,3 @@ if __name__ == "__main__":
 
     process_csv_with_batch_indices(select_dataset, f"{args.val_type}_dataset_not_select_{args.dataset_percentage}.csv", topk_indices, f"./data/{args.model_name}/{args.model_size}_{args.val_type}_{args.dataset_percentage}", str(args.percentage), batch_size)
     preserve_csv_with_batch_indices(select_dataset, f"{args.val_type}_dataset_select_{args.dataset_percentage}.csv", topk_indices, f"./data/{args.model_name}/{args.model_size}_{args.val_type}_{args.dataset_percentage}", str(args.percentage), batch_size)
-    # process_csv_with_batch_indices(select_dataset, f"balance_dataset_not_select_{args.test_set}.csv", topk_indices, f"./data/{args.model_size}_{args.val_type}_{args.test_set}/bs{args.bs}", str(args.percentage), batch_size)
-    # preserve_csv_with_batch_indices(select_dataset, f"balance_dataset_select_{args.test_set}.csv", topk_indices, f"./data/{args.model_size}_{args.val_type}_{args.test_set}/bs{args.bs}", str(args.percentage), batch_size)

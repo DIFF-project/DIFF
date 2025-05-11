@@ -1,24 +1,32 @@
+# ========== 标准库 ==========
 import os
-import matplotlib.pyplot as plt
-import pandas as pd
-from torch.utils.data import Dataset
-from transformers import AutoTokenizer
-import torch
-import pytorch_lightning as pl
-from torch.utils.data import DataLoader
-from pytorch_lightning.callbacks import ModelCheckpoint
-from transformers import AutoModelForCausalLM, AdamW, get_cosine_schedule_with_warmup, get_cosine_with_hard_restarts_schedule_with_warmup
-import torch.nn as nn
 import math
 import warnings
-from torchmetrics.functional.classification import auroc
-import torch.nn.functional as F
-from safetensors.torch import save_file
-from transformers import OPTForCausalLM
 import argparse
-import pdb
-from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training, TaskType
+
+import pandas as pd
+import matplotlib.pyplot as plt
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.utils.data import Dataset, DataLoader
+import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint
+from torchmetrics.functional.classification import auroc
+
+from transformers import (
+    AutoTokenizer,
+    AutoModelForCausalLM,
+    AdamW,
+    get_cosine_schedule_with_warmup,
+)
+
+from peft import (
+    LoraConfig,
+    get_peft_model,
+    TaskType
+)
 
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 

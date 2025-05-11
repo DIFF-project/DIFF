@@ -106,6 +106,5 @@ if __name__ == "__main__":
 
     random_indices = torch.randperm(total_samples)[:args.max_samples]
     
-    # preserve_csv_with_batch_indices("balanced_dataset.csv", "balanced_dataset_random.csv", random_indices, "./data/small_balance", str(args.percentage), batch_size)
     preserve_csv_with_batch_indices("output_mid_wino.csv", "wino_dataset_random2.csv", random_indices, "./data/small_wino", str(args.percentage), batch_size)
     

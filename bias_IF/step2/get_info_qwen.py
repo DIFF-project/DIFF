@@ -1,16 +1,13 @@
-import argparse
 import os
 import pdb
-from copy import deepcopy
-from typing import Any
-from safetensors.torch import load_file
 import torch
-import pytorch_lightning as pl
-from torch.utils.data import Dataset, DataLoader
-import pandas as pd
-from transformers import AutoModelForCausalLM, AutoTokenizer, GPT2Tokenizer
-from transformers import OPTForCausalLM
+import argparse
 
+import pytorch_lightning as pl
+import pandas as pd
+
+from torch.utils.data import Dataset, DataLoader
+from transformers import AutoModelForCausalLM, AutoTokenizer
 from step2.collect_grad_reps import (collect_grads, collect_reps, get_loss)
 
 class UCC_Dataset(Dataset):

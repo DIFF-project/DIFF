@@ -11,15 +11,13 @@ RUN apt-get update && apt-get install -y \
     screen \
     && rm -rf /var/lib/apt/lists/*
 
-# RUN pip install torch==2.3.0 torchvision==0.18.0 torchaudio==2.3.0 --index-url https://download.pytorch.org/whl/cu121
-
 RUN pip install torch==2.5.0 torchvision==0.20.0 torchaudio==2.5.0 --index-url https://download.pytorch.org/whl/cu118
 RUN pip install pytorch-lightning
 
-RUN pip install transformers==4.43.2 -i https://mirrors.bfsu.edu.cn/pypi/web/simple
-RUN pip install matplotlib -i https://mirrors.bfsu.edu.cn/pypi/web/simple
-RUN pip install scikit-learn -i https://mirrors.bfsu.edu.cn/pypi/web/simple ninja
-RUN pip install peft -i https://mirrors.bfsu.edu.cn/pypi/web/simple
-RUN pip install traker -i https://mirrors.bfsu.edu.cn/pypi/web/simple
+RUN pip install transformers==4.43.2
+RUN pip install matplotlib
+RUN pip install scikit-learn
+RUN pip install peft
+RUN pip install traker
 
 CMD ["python3"]

@@ -6,11 +6,19 @@
 
 ## Install
 
-```bash
-# Install torch based on your cuda version
-pip install torch==2.5.0 torchvision==0.20.0 torchaudio==2.5.0 --index-url https://download.pytorch.org/whl/cu121
-pip install -r requirements.txt
-```
+- pip
+
+  ```bash
+  # Install torch based on your cuda version
+  pip install torch==2.5.0 torchvision==0.20.0 torchaudio==2.5.0 --index-url https://download.pytorch.org/whl/cu121
+  pip install -r requirements.txt
+  ```
+
+- docker
+
+  ```bash
+  docker build -t DIFF .
+  ```
 
 ## Step 1: Warmup/Train your model for few epochs
 

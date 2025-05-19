@@ -91,22 +91,3 @@ if __name__ == "__main__":
     tokenizer.pad_token_id = tokenizer.eos_token_id 
     runner = Runner(model, tokenizer, config['data_path'])
     results = runner()
-
-    # if config['model_path']:
-    #   output_path = f"{config['store_path']}/results_mid_{config['data_type']}_select_{config['val_type']}/{config['percentage']}_bs{args.bs}/crows_ft.json"
-    # else:
-    #   output_path = f"{config['store_path']}/results_mid_{config['data_type']}_select_{config['val_type']}/{config['percentage']}_bs{args.bs}/crows.json"
-       
-    # if config['model_path']:
-    #   output_path = f"{config['store_path']}/{name}/results_mid_select_crows_{config['val_type']}_{config['dataset_percentage']}_retrained/{config['percentage']}/crows_ft.json"
-    # else:
-    #   output_path = f"{config['store_path']}/{name}/results_mid_select_crows_{config['val_type']}_{config['dataset_percentage']}_retrained/{config['percentage']}/crows.json"
-       
-    # if config['model_path']:
-    #   output_path = f"{config['store_path']}/results_mid_{config['val_type']}_select_crows_ig/crows_ft.json"
-    # else:
-    #   output_path = f"{config['store_path']}/results_mid_{config['val_type']}_select_crows_ig/crows.json"
-       
-    # os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    # with open(output_path, 'w') as f:
-    #     json.dump(results, f, indent=2)

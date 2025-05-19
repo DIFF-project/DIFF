@@ -101,16 +101,3 @@ if __name__ == "__main__":
       output_path = f"{config['store_path']}/results_small_ascent_{config['val_type']}_{config['dataset_percentage']}/{config['percentage']}/crows_ft.json"
     else:
       output_path = f"{config['store_path']}/results_small_ascent_{config['val_type']}_{config['dataset_percentage']}/{config['percentage']}/crows.json"
-    # if config['model_path']:
-    #   output_path = f"{config['store_path']}/results_small_select_{config['val_type']}/{config['percentage']}/crows_full.json"
-    # else:
-    #   output_path = f"{config['store_path']}/results_small_select_{config['val_type']}/{config['percentage']}/crows.json"
-      
-    # if config['model_path']:
-    #   output_path = f"{config['store_path']}/results_small_{config['val_type']}_select_ig/crows_ft.json"
-    # else:
-    #   output_path = f"{config['store_path']}/results_small_{config['val_type']}_select_ig/crows.json"
-       
-    # os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    # with open(output_path, 'w') as f:
-    #     json.dump(results, f, indent=2)

@@ -1,6 +1,6 @@
-# Data Attribution With Influence function (DIFF)
+# Bias Data Attribution With Influence function (BIAS DIFF)
 
-> This is the repository of project "Data Attribution With Influence function(DIFF)". To replicate our results, you may follow the steps below
+> This is the repository of project "Bias Data Attribution With Influence function(BIAS DIFF)". To replicate our results, you may follow the steps below
 
 ![main](./fig/main.png)
 
